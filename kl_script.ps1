@@ -1,7 +1,3 @@
-# Creator: Securethelogs | @Securethelogs
-# Modified for Network Stream by Venice
-# FIXED for Linux/Mac Terminals
-
 # --- Network Configuration ---
 $targetIP = "192.168.8.199"
 $targetPort = 4444
