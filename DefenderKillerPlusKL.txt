@@ -1,11 +1,3 @@
-REM Ducky Script to disable Windows Defender and download keylogger kl_script
-ATTACKMODE HID
-REM Title: Disable Defender & Download/Execute Script (Persistent Background)
-REM Author: Zero_Sploit -> B33m0 -> UberGuidoZ -> Kieran Human -> Revised
-REM Description: Disables UAC and Windows Defender, downloads and executes a persistent PowerShell script from GitHub
-REM Target: Windows 10/11 (Powershell)
-REM Version: 2.3
-
 REM Pause for everything to recognize and be ready
 DELAY 2000
 
