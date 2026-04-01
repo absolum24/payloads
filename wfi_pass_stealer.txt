@@ -1,14 +1,3 @@
-REM Title:         Ducky WiFi Grabber (PowerShell TCP Version - Fixed)
-REM Description:   Steals wifi passwords and sends them to remote IP via PowerShell TCP
-REM Author:        Zero_Sploit (Modified)
-REM Props:         Hak5 Team
-REM Version:       1.3
-REM Category:      Exfiltration
-REM Target:        Windows 10 (Powershell)
-REM Attackmodes:   HID
-REM Some editing on your part is needed such as remote IP and port
-REM This script is for educational purposes only please do not use this for malicious purposes
-
 REM Open PowerShell directly
 DELAY 1000
 GUI r
